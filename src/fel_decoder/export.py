@@ -116,6 +116,14 @@ def export_decoded(
             _trend_rows(decoded.groups["trends"], record_indices),
         )
         files.append("trends.csv")
+        for name in ("energy_trends", "demand"):
+            if name not in decoded.groups:
+                continue
+            arrays = decoded.groups[name]
+            fields = [key for key in arrays if key not in metadata]
+            _write_csv(destination / f"{name}.csv", [*metadata, *fields],
+                       _event_rows(arrays, record_indices))
+            files.append(f"{name}.csv")
 
     manifest = decoded.manifest()
     manifest.update({
@@ -127,6 +135,7 @@ def export_decoded(
             "record_index": "Zero-based index in records.csv, including uninterpreted records.",
             "sample_index": "Zero-based within each capture record, never a continuous stream index.",
             "transient_relative_time": "sample_index / sample_rate_hz seconds from the record start_ticks.",
+            "named_trend_fields": "energy_trends/demand columns follow verified vendor schemas; values retain stored units. trend_period/demand_period are nominal seconds; timestamp endpoints retain actual boundaries.",
             "trend_fields": "Three stored fields per numbered channel slot. Minimum, maximum, average ordering is inferred from the validation corpus, not independently vendor-validated.",
         },
     })

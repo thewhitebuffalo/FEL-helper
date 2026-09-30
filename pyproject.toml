@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "FEL-helper"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Fast, independently developed decoder for selected records in Fluke FEL recordings"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,10 +12,14 @@ dependencies = ["numpy>=1.24,<3"]
 authors = [{name = "Jason Strebe"}]
 
 [project.optional-dependencies]
-test = ["pytest>=8,<10"]
+test = ["pytest>=8,<10", "pyarrow>=14", "olefile>=0.47"]
+validation = ["pyarrow>=14", "olefile>=0.47"]
 
 [project.scripts]
 fel-helper = "fel_decoder.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "fel_decoder._version.__version__"}

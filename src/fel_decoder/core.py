@@ -12,10 +12,14 @@ import struct
 
 import numpy as np
 
+from ._version import __version__
+from .layouts import LAYOUTS, PROFILE, resolve_layout, field_unit, layout_inventory
+
 HEADER_SIZE = 32
 MAGIC = bytes.fromhex("0bba1400")
 PROFILE_BYTES = bytes.fromhex("0000090000000000")
-KNOWN_SIZES = {105: 5208, 111: 104, 112: 32064, 119: 1724}
+# Compatibility alias; actual dispatch uses the profile/tag/size registry.
+KNOWN_SIZES = {layout.tag: layout.size for layout in LAYOUTS}
 FILETIME_UNIX_EPOCH = 116444736000000000
 WAVE_DTYPE = np.dtype([("offset_us", "<u4"), ("raw", "<i2", (8,))])
 
@@ -39,12 +43,23 @@ class DecodedFile:
     source_sha256: str
     header_hex: str
 
+    def measurement(self, name: str) -> np.ndarray:
+        """Access a verified named trend field without depending on its wire tag.
+
+        Returns values in stored units, with rows aligned to energy_trends
+        metadata. Unnamed tag-119 slots are intentionally not assigned meanings.
+        """
+        group = self.groups.get("energy_trends", {})
+        if name not in group or name not in next(l.fields for l in LAYOUTS if l.group == "energy_trends"):
+            raise KeyError(f"Named trend measurement unavailable: {name}")
+        return group[name]
+
     def manifest(self) -> dict:
         counts = Counter(r.tag for r in self.records)
         return {
-            "schema_version": 1,
-            "decoder_version": "0.1.0",
-            "profile": "observed-fel-0bba1400",
+            "schema_version": 2,
+            "decoder_version": __version__,
+            "profile": PROFILE,
             "source_bytes": self.source_bytes,
             "source_sha256": self.source_sha256,
             "header_hex": self.header_hex,
@@ -53,9 +68,14 @@ class DecodedFile:
             "uninterpreted_record_counts": {
                 str(k): v for k, v in sorted(counts.items()) if k not in KNOWN_SIZES
             },
-            "coverage": "Selected fields in tags 105, 111, 112 and 119 only; not a complete FEL conversion.",
+            "record_layouts": layout_inventory(self.records),
+            "named_fields": {
+                layout.group: {field: {"unit": field_unit(field)} for field in layout.fields}
+                for layout in LAYOUTS if layout.fields and layout.group in self.groups
+            },
+            "coverage": "Registered layouts only: named energy trends/demand plus selected event, waveform, transient and unnamed trend fields; not a complete FEL conversion.",
             "time_basis": "Unadjusted instrument ticks: 100 ns since 1601-01-01, high word then low word. Clock accuracy and synchronization are not verified.",
-            "channel_basis": "Numbered slots only. No wiring, voltage reference, engineering unit or phase-angle interpretation is inferred.",
+            "channel_basis": "Energy trend/demand field names follow verified vendor exports; other channels retain numbered slots. Physical wiring, clock accuracy and unlisted units are not inferred.",
             "missing_values": "NaN is preserved. It must not be treated as a zero measurement.",
             "groups": {
                 name: {key: {"shape": list(a.shape), "dtype": str(a.dtype)} for key, a in arrays.items()}
@@ -183,10 +203,12 @@ def decode_bytes(data: bytes) -> DecodedFile:
     records = scan_bytes(data)
     selected = {tag: [] for tag in KNOWN_SIZES}
     for r in records:
-        if r.tag in KNOWN_SIZES:
-            if r.size != KNOWN_SIZES[r.tag]:
-                raise FelError(f"Unsupported length {r.size} for tag {r.tag} at byte {r.offset}; expected {KNOWN_SIZES[r.tag]}")
+        layout = resolve_layout(r.tag, r.size)
+        if layout is not None:
             selected[r.tag].append(r)
+        elif r.tag in KNOWN_SIZES:
+            expected = sorted(l.size for l in LAYOUTS if l.tag == r.tag)
+            raise FelError(f"Unsupported length {r.size} for tag {r.tag} at byte {r.offset}; registered lengths: {expected}")
     if not any(selected.values()):
         raise FelError("No supported measurement records found; use inspect to inventory this file")
     event_rows, event_fields = [], []
@@ -217,6 +239,19 @@ def decode_bytes(data: bytes) -> DecodedFile:
         "transients": _samples(data, selected[112], transient=True),
         "trends": trends,
     }
+    for layout in LAYOUTS:
+        if not layout.fields or not selected[layout.tag]:
+            continue
+        rows, periods, values = [], [], []
+        for r in selected[layout.tag]:
+            rows.append((r.offset, *_times(data, r)))
+            periods.append(struct.unpack_from("<I", data, r.offset + 20)[0])
+            values.append(np.frombuffer(data, dtype="<f4", count=len(layout.fields), offset=r.offset + 24))
+        group = _metadata(rows)
+        group[layout.period_field] = _array(periods, "<u4")
+        matrix = _array(values, "<f4", (-1, len(layout.fields)))
+        group.update({name: matrix[:, i] for i, name in enumerate(layout.fields)})
+        groups[layout.group] = group
     return DecodedFile(records, groups, len(data), hashlib.sha256(data).hexdigest(), data[:32].hex())
 
 

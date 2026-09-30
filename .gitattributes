@@ -1,0 +1,7 @@
+# Keep source bytes identical to the committed code on every platform so that
+# validation reports can verify the decoder against an exact Git commit.
+*.py text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf

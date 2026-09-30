@@ -7,7 +7,10 @@ CSV paths are optional. Relative paths resolve beside the manifest. Results may
 contain local filenames and must stay outside the public repository.
 
 The independent struct reader checks extraction, not electrical interpretation.
-Only vendor CSV comparisons provide independent measurement-value validation.
+Named tag-70/71 field labels come from the decoder registry, so these checks do
+not independently validate those labels. Vendor event/transient CSV comparisons
+validate only their corresponding measurements. Use validate_energy_exports.py
+for independent comparisons with native energy-trend/demand exports.
 """
 
 from __future__ import annotations
@@ -34,6 +37,7 @@ import numpy as np
 # Supports an editable installation or execution directly from a source checkout.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from fel_decoder.core import decode_bytes, decode_file  # noqa: E402
+from fel_decoder.layouts import ENERGY_TREND_FIELDS, DEMAND_FIELDS  # noqa: E402
 
 EPOCH = datetime(1601, 1, 1, tzinfo=timezone.utc)
 DECIMAL_TOLERANCE = 0.0006
@@ -45,6 +49,14 @@ CHANNELS = {1: "-1---", 2: "--2--", 4: "---3-", 14: "P-23-", 15: "P123-"}
 SEVERITIES = {0: "NOT_SPECIFIED", 2: "MEDIUM", 3: "LOW"}
 WINDOWS = ("wave_start", "wave_end", "rms_start", "rms_end",
            "msv_start", "msv_end", "transient_start", "transient_end")
+# Sizes/counts are independent literals. Field names are shared deliberately:
+# this is an extraction check, not a second source of electrical semantics.
+NAMED_LAYOUTS = {
+    70: (744, 180, "energy_trends", "trend_period", ENERGY_TREND_FIELDS),
+    71: (104, 20, "demand", "demand_period", DEMAND_FIELDS),
+}
+GROUP_NAMES = {105: "waveforms", 111: "events", 112: "transients", 119: "trends",
+               70: "energy_trends", 71: "demand"}
 
 
 def require(condition, description):
@@ -90,15 +102,32 @@ def validate_struct(data, decoded):
     checked = Counter()
     cursors = Counter()
     for offset, tag, size in reference:
-        if tag not in (105, 111, 112, 119):
+        if tag not in GROUP_NAMES:
             continue
-        name = {105: "waveforms", 111: "events", 112: "transients", 119: "trends"}[tag]
+        name = GROUP_NAMES[tag]
+        require(name in groups, f"Missing decoded group: {name}")
         group, row = groups[name], seen[tag]
         seen[tag] += 1
         require(int(group["record_offset"][row]) == offset, f"{name}: wrong record offset")
         for key, rel in (("start_ticks", 4), ("end_ticks", 12)):
             require(int(group[key][row]) == ticks(data, offset + rel), f"{name}: wrong {key}")
-        if tag == 111:
+        if tag in NAMED_LAYOUTS:
+            expected_size, count, _, period_key, fields = NAMED_LAYOUTS[tag]
+            require(size == expected_size, f"{name}: unsupported reference record size")
+            require(len(fields) == count and len(set(fields)) == count,
+                    f"{name}: field registry differs from the reference field count")
+            expected_keys = ("record_offset", "start_ticks", "end_ticks", period_key, *fields)
+            require(tuple(group) == expected_keys, f"{name}: output fields/order differ from registry")
+            expected_period = struct.unpack_from("<I", data, offset + 20)[0]
+            require(int(group[period_key][row]) == expected_period, f"{name}: wrong {period_key}")
+            # Deliberately unpack each scalar without np.frombuffer or the
+            # decoder's layout dispatch. Every float is checked, including NaNs.
+            for index, field in enumerate(fields):
+                expected = struct.unpack_from("<f", data, offset + 24 + index * 4)[0]
+                equal(group[field][row], expected, f"{name}: {field} differs from scalar struct reference")
+            checked[name + "_records"] += 1
+            checked[name + "_scalar_values"] += count
+        elif tag == 111:
             for key, fmt, rel in (("event_id", "<I", 20), ("event_type", "<H", 24),
                                   ("channel_code", "<H", 26), ("value", "<f", 28),
                                   ("depth", "<f", 32), ("severity", "<I", 36)):
@@ -117,7 +146,7 @@ def validate_struct(data, decoded):
             begin = cursors[tag]
             require(int(group["sample_start"][row]) == begin, "Incorrect sample boundary")
             require(int(group["sample_count"][row]) == count, "Incorrect sample count")
-            require(base + count * stride == size, "Observed profile has unexpected unused sample bytes")
+            require(count > 0 and base + count * stride <= size, "Sample count exceeds record capacity")
             selection = slice(begin, begin + count)
             coefficients = struct.unpack_from(f"<{2 * channels}f", data, offset + 20)
             equal(group["coefficients"][row], np.array(coefficients).reshape(channels, 2), "Wrong coefficients")
@@ -142,12 +171,26 @@ def validate_struct(data, decoded):
             checked[name + "_sample_rows"] += count
             checked[name + "_scalar_values"] += count * channels
             cursors[tag] += count
-    for tag, name in ((105, "waveforms"), (111, "events"), (112, "transients"), (119, "trends")):
+    for tag, name in GROUP_NAMES.items():
+        if tag in NAMED_LAYOUTS and not seen[tag]:
+            require(name not in groups, f"Unexpected empty {name} group")
+            continue
         require(len(groups[name]["record_offset"]) == seen[tag], f"Wrong {name} output length")
+        if tag in NAMED_LAYOUTS:
+            _, _, _, period_key, fields = NAMED_LAYOUTS[tag]
+            for field, values in groups[name].items():
+                require(values.shape == (seen[tag],), f"{name}/{field}: wrong array shape")
+                expected_dtype = ("<f4" if field in fields else "<u4" if field == period_key else "<u8")
+                require(values.dtype == np.dtype(expected_dtype), f"{name}/{field}: wrong dtype")
     for tag, name in ((105, "waveforms"), (112, "transients")):
         require(len(groups[name]["values"]) == cursors[tag], f"Wrong {name} sample length")
     return {"record_count": len(reference), "record_counts": dict(sorted(Counter(t for _, t, _ in reference).items())),
-            "checked": dict(checked)}
+            "checked": dict(checked), "validation_kind": "structural_extraction",
+            "coverage": {
+                "supported_tags": sorted(GROUP_NAMES),
+                "named_field_labels": "Shared decoder registry; not independently validated by this scalar reader.",
+                "vendor_energy_trend_or_demand_validation": False,
+            }}
 
 
 def iso_ticks(value, local_zone):
@@ -334,6 +377,16 @@ def check_export_csv(destination, decoded, samples):
         (metadata_values(trends, row) + list(trends["values"][row].flat)
          for row in range(len(trends["record_offset"]))),
     )
+    for name in ("energy_trends", "demand"):
+        if name not in decoded.groups:
+            continue
+        group = decoded.groups[name]
+        fields = [key for key in group if key not in metadata]
+        counts[name] = check_csv(
+            destination / (name + ".csv"), metadata + fields,
+            (metadata_values(group, row) + [group[key][row] for key in fields]
+             for row in range(len(group["record_offset"]))),
+        )
     return counts
 
 
@@ -368,13 +421,14 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--runs", type=int, default=3, help="Repeated decode/read/hash timing runs (default: 3)")
     parser.add_argument("--export-output", type=Path,
-                        help="Also validate default/compressed exports for every file and full sample CSVs for the first file containing transients; write a separate private JSON report")
+                        help="Also validate default/compressed exports for every file and full CSVs for the first file containing transients and each previously unchecked named group; write a separate private JSON report")
     args = parser.parse_args()
     require(args.runs >= 3, "Use at least three benchmark runs")
     report = {"status": "running", "validation_scope": [
-        "All extracted raw samples, scaled values, event fields, selected trend triples and record boundaries checked against an independent scalar struct reader.",
+        "All extracted raw samples, scaled values, event fields, selected trend triples, tag-70/71 float fields, periods, timestamps and record boundaries checked against an independent scalar struct reader.",
         "Vendor event and transient CSVs, when supplied, independently validate their supported values and timestamps.",
-        "Waveform and trend checks are structural/extraction checks; they do not establish independent vendor-value validation or channel electrical meaning.",
+        "Waveform and trend checks are structural/extraction checks; tag-70/71 labels are shared from the decoder registry. None establish independent vendor-value validation or channel electrical meaning.",
+        "Event/transient vendor CSVs do not validate tag-70/71 energy trends or demand. Run validate_energy_exports.py against native tables for that separate evidence.",
         "Tolerance 0.0006 covers decimal rounding of the available vendor exports; this is not an instrument accuracy specification.",
         "Benchmark includes file reading, framing, decoding and SHA-256; repeated reads can use the OS cache. CSV validation and output writing are excluded.",
     ], "recordings": []}
@@ -382,6 +436,7 @@ def main():
                      "Single end-to-end read/decode/write per variant, warm OS cache; validation/reloading excluded. No fsync durability claim. Temporary exports are removed after checking."}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     csv_checked = False
+    named_csv_checked = set()
     try:
         manifest = json.loads(args.manifest.read_text())
         require(bool(manifest.get("recordings")), "Manifest must list recordings")
@@ -401,9 +456,14 @@ def main():
                     result["vendor_transients"] = validate_transients(resolve_path(item["transient_csv"], args.manifest.parent),
                                                                        decoded.groups["transients"], local_zone)
             if args.export_output:
-                csv_this_file = not csv_checked and len(decoded.groups["transients"]["values"]) > 0
+                has_transients = len(decoded.groups["transients"]["values"]) > 0
+                named_present = {name for name in ("energy_trends", "demand") if name in decoded.groups}
+                csv_this_file = ((not csv_checked and has_transients)
+                                 or bool(named_present - named_csv_checked))
                 export_report["recordings"].append(validate_exports(path, decoded, args.output.parent, csv_this_file))
-                csv_checked = csv_checked or csv_this_file
+                csv_checked = csv_checked or (csv_this_file and has_transients)
+                if csv_this_file:
+                    named_csv_checked.update(named_present)
             del decoded, data
             durations = []
             for _ in range(args.runs):
@@ -424,12 +484,17 @@ def main():
             "records": sum(r["struct_reference"]["record_count"] for r in report["recordings"]),
             "vendor_event_rows": sum(r.get("vendor_events", {}).get("rows_checked", 0) for r in report["recordings"]),
             "vendor_transient_sample_rows": sum(r.get("vendor_transients", {}).get("sample_rows_checked", 0) for r in report["recordings"]),
+            "named_layout_structural_checks": {
+                key: sum(r["struct_reference"]["checked"].get(key, 0) for r in report["recordings"])
+                for key in ("energy_trends_records", "energy_trends_scalar_values", "demand_records", "demand_scalar_values")
+            },
             "sum_median_decode_seconds": total_seconds,
             "aggregate_megabytes_per_second": total_bytes / 1000000 / total_seconds,
         }
         report["status"] = "passed"
         export_report["status"] = "passed"
         export_report["full_sample_csv_checked"] = csv_checked
+        export_report["named_csv_groups_checked"] = sorted(named_csv_checked)
     except Exception as exc:
         report["status"] = "failed"
         report["error"] = f"{type(exc).__name__}: {exc}"
