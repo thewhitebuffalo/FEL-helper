@@ -19,6 +19,13 @@ python -m pip install .
 fel-helper --help
 ```
 
+To get the source with Git first:
+
+```sh
+git clone https://github.com/thewhitebuffalo/FEL-helper.git
+cd FEL-helper
+```
+
 On Windows, activate with `.venv\Scripts\Activate.ps1` in PowerShell.
 
 ## Use

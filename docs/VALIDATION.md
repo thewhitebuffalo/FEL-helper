@@ -23,9 +23,12 @@ precision; output overwrite refusal; and interrupted export handling.
 
 The fixtures are generated from synthetic numbers with a separate `struct`
 writer. An independent scalar arithmetic oracle checks randomized scaling cases.
-The GitHub Actions matrix is configured for Linux, macOS, and Windows, but those
-hosted runs have **not run yet**. Local checks do not establish Windows or Linux
-compatibility.
+The [initial GitHub Actions run](https://github.com/thewhitebuffalo/FEL-helper/actions/runs/36654771150)
+also passed all six hosted jobs: Linux with Python 3.10, 3.12, 3.13 and 3.14,
+plus macOS and Windows with Python 3.12. Each job installed the package, ran the
+tests, and checked the command-line entry point. These checks establish
+compatibility for the tested environments and synthetic fixtures; the private
+recording comparisons described below were performed locally on macOS.
 
 ## Checks against locally held recordings
 
