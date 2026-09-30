@@ -80,6 +80,11 @@ load with `numpy.load(path, allow_pickle=False)`.
 | Waveforms (105) | Eight numbered slots, original signed samples, per-record scale/offset coefficients, calibrated values, microsecond offsets |
 | Transients (112) | Four numbered slots, original signed samples, coefficients, calibrated values, sample rate |
 | Trends (119) | First six numbered slots, each with three statistics in stored order: minimum, maximum, average |
+| Energy trends (70) | Nominal period and 180 named fields, including RMS current and total active/apparent power min/max/average |
+| Demand (71) | Nominal period and 20 named fields from the verified vendor schema |
+
+See [named energy layouts](docs/ENERGY_LAYOUTS.md) for tag-independent measurement
+access, stored units, export compatibility and the native-validation scope.
 
 All record offsets, tags, and sizes appear in the inventory. Unknown tags are
 counted explicitly, but their payloads are not decoded. Even supported tags
@@ -88,8 +93,9 @@ these exports are not a replacement for it.
 
 ## Interpretation limits
 
-- Channel slots have **no automatic L–L, L–G, current, phase-angle, or unit
-  assignment**. Those require verified instrument configuration and wiring.
+- Numbered channel slots have **no automatic L–L, L–G, current, phase-angle, or unit
+  assignment**. The new energy trend/demand fields use verified vendor names;
+  physical wiring and instrument configuration still require verification.
 - Waveform and transient samples are instantaneous quantities. This tool does
   not calculate RMS current, identify breaker operation, or infer trip causes.
 - Timestamps preserve the instrument clock. They do not establish correct wall
@@ -117,6 +123,12 @@ python -m pytest -q
 Tests generate synthetic bytes in memory. No client recordings or extracted
 client data are included. See [VALIDATION.md](docs/VALIDATION.md) for the tested
 scope and for independent validation against locally held vendor exports.
+
+Version 0.2.0 adds [reproducible native-export validation](docs/NATIVE_VALIDATION.md).
+The actual decoder matched all 2,299,160 measurement and metadata cells in two
+native imports exactly. The tested commit and sanitized result are recorded in
+[PR #1](https://github.com/thewhitebuffalo/FEL-helper/pull/1). Synthetic regression
+tests remain separate from this vendor-export evidence.
 
 The source can be run before installation using
 `PYTHONPATH=src python -m fel_decoder --help` on macOS/Linux.

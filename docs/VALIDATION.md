@@ -1,9 +1,30 @@
-# Validation of FEL-helper 0.1.0
+# Validation history and release scope
 
-The implemented extraction paths pass the checks below. This is not evidence
-that every FEL format variant or every field is understood. Client recordings,
-vendor exports, filenames, source hashes, and detailed local results are not
-included in the repository.
+## Version 0.2.0 release candidate
+
+Version 0.2.0 adds named tag-70/71 layouts and a
+[reproducible native-export validator](NATIVE_VALIDATION.md). Against two native
+imports, the actual decoder matched all 2,208,800 named measurement values,
+60,240 timestamps, and 30,120 nominal periods exactly. Both embedded source FELs
+were byte-identical to the decoded inputs. Maximum errors and mismatch counts
+were zero. These native tables contained no NaNs; missing-value handling is
+covered by the synthetic tests. The clean tested commit and sanitized result are
+recorded in [PR #1](https://github.com/thewhitebuffalo/FEL-helper/pull/1).
+
+The expanded local suite passes 112 tests plus 135 subtests. The original eight
+recordings retain the same original output arrays and pass their vendor event
+and transient comparisons. Structural checks also pass for all six additional
+energy recordings (30,131 energy-trend records and 60,258 demand records).
+Only two of those six have independent native exports; structural checks on the
+other four do not establish independent vendor agreement. See
+[ENERGY_LAYOUTS.md](ENERGY_LAYOUTS.md) for the supported mapping and its limits.
+
+## Historical validation of version 0.1.0
+
+The checks and measurements below were completed for version 0.1.0 and its four
+original extraction paths. They do not establish support for every FEL variant
+or every field. Client recordings, vendor exports, filenames, source hashes, and
+detailed local results are not included in the repository.
 
 ## Automated checks
 
