@@ -1,0 +1,21 @@
+# Recordings and decoded client data must never be committed.
+*.[fF][eE][lL]
+*.npz
+*.npy
+*.zip
+*.pdf
+*.docx
+private/
+local-validation/
+decoded/
+__pycache__/
+.pytest_cache/
+.coverage
+htmlcov/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.DS_Store
