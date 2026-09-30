@@ -239,17 +239,44 @@ def test_mismatches_cannot_produce_pass(fixture, tmp_path, monkeypatch):
 
 
 def test_wrong_import_and_untracked_validator_are_rejected(monkeypatch):
-    import fel_decoder.core
+    from types import SimpleNamespace
+
+    # This test models a clean checkout explicitly. CI imports a non-editable
+    # installed wheel before this module; its real module paths must not serve as
+    # the mocked clean-checkout case (nor be changed for other tests).
+    modules = {
+        name: SimpleNamespace(__file__=str(check.ROOT / relative))
+        for name, relative in (
+            ("fel_decoder", "src/fel_decoder/__init__.py"),
+            ("fel_decoder._version", "src/fel_decoder/_version.py"),
+            ("fel_decoder.core", "src/fel_decoder/core.py"),
+            ("fel_decoder.layouts", "src/fel_decoder/layouts.py"),
+        )
+    }
+    monkeypatch.setattr(check, "importlib", SimpleNamespace(import_module=modules.__getitem__))
+    validator_untracked = False
+
     def git(*args):
         if args[0] == "rev-parse" and args[1] == "--show-toplevel": return str(check.ROOT).encode()
         if args[0] == "rev-parse": return b"b" * 40
         if args[0] == "status": return b""
-        if args[0] == "show": return (check.ROOT / args[1].split(":", 1)[1]).read_bytes()
+        if args[0] == "show":
+            relative = args[1].split(":", 1)[1]
+            if validator_untracked and relative == "tools/validate_energy_exports.py":
+                raise check.ValidationFailure("git_provenance_unavailable")
+            return (check.ROOT / relative).read_bytes()
         raise AssertionError(args)
+
     monkeypatch.setattr(check, "_git", git)
     assert check.source_provenance()["dirty"] is False
-    monkeypatch.setattr(fel_decoder.core, "__file__", "/stale-installed/core.py")
+    core = modules["fel_decoder.core"]
+    original_path = core.__file__
+    core.__file__ = str(check.ROOT.parent / "stale-installed" / "core.py")
     with pytest.raises(check.ValidationFailure, match="decoder_imported_outside_checkout"):
+        check.source_provenance()
+    core.__file__ = original_path
+    validator_untracked = True
+    with pytest.raises(check.ValidationFailure, match="validator_or_decoder_not_in_commit"):
         check.source_provenance()
 
 
