@@ -5,6 +5,8 @@
 *.zip
 *.pdf
 *.docx
+*.[fF][cC][aA]2
+*.[pP][aA][rR][qQ][uU][eE][tT]
 private/
 local-validation/
 decoded/
