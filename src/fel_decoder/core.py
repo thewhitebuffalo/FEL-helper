@@ -12,6 +12,7 @@ import struct
 
 import numpy as np
 
+from ._version import __version__
 from .layouts import LAYOUTS, PROFILE, resolve_layout, field_unit, layout_inventory
 
 HEADER_SIZE = 32
@@ -57,7 +58,7 @@ class DecodedFile:
         counts = Counter(r.tag for r in self.records)
         return {
             "schema_version": 2,
-            "decoder_version": "0.1.0",
+            "decoder_version": __version__,
             "profile": PROFILE,
             "source_bytes": self.source_bytes,
             "source_sha256": self.source_sha256,

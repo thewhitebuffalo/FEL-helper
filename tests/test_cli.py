@@ -81,7 +81,8 @@ def test_help_and_version(capsys):
     with pytest.raises(SystemExit) as result:
         main(["--version"])
     assert result.value.code == 0
-    assert "FEL-helper 0.1.0" in capsys.readouterr().out
+    from fel_decoder import __version__
+    assert f"FEL-helper {__version__}" in capsys.readouterr().out
 
 
 def test_inspect_counts_only(recording, capsys):

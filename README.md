@@ -124,5 +124,9 @@ Tests generate synthetic bytes in memory. No client recordings or extracted
 client data are included. See [VALIDATION.md](docs/VALIDATION.md) for the tested
 scope and for independent validation against locally held vendor exports.
 
+This branch targets version 0.2.0. The published 0.1.0 validation results are
+historical; native-export comparison of the new named energy layouts is pending.
+Synthetic regression tests do not establish agreement with native exports.
+
 The source can be run before installation using
 `PYTHONPATH=src python -m fel_decoder --help` on macOS/Linux.
