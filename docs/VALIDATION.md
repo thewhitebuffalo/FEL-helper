@@ -1,5 +1,9 @@
 # Validation of FEL-helper 0.1.0
 
+The historical checks below describe the original four extraction paths. The
+additional named tag-70/71 layouts, regression tests and independent native-export
+comparison scope are documented in [ENERGY_LAYOUTS.md](ENERGY_LAYOUTS.md).
+
 The implemented extraction paths pass the checks below. This is not evidence
 that every FEL format variant or every field is understood. Client recordings,
 vendor exports, filenames, source hashes, and detailed local results are not

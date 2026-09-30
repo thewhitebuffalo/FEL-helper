@@ -80,6 +80,11 @@ load with `numpy.load(path, allow_pickle=False)`.
 | Waveforms (105) | Eight numbered slots, original signed samples, per-record scale/offset coefficients, calibrated values, microsecond offsets |
 | Transients (112) | Four numbered slots, original signed samples, coefficients, calibrated values, sample rate |
 | Trends (119) | First six numbered slots, each with three statistics in stored order: minimum, maximum, average |
+| Energy trends (70) | Nominal period and 180 named fields, including RMS current and total active/apparent power min/max/average |
+| Demand (71) | Nominal period and 20 named fields from the verified vendor schema |
+
+See [named energy layouts](docs/ENERGY_LAYOUTS.md) for tag-independent measurement
+access, stored units, export compatibility and the native-validation scope.
 
 All record offsets, tags, and sizes appear in the inventory. Unknown tags are
 counted explicitly, but their payloads are not decoded. Even supported tags
@@ -88,8 +93,9 @@ these exports are not a replacement for it.
 
 ## Interpretation limits
 
-- Channel slots have **no automatic L–L, L–G, current, phase-angle, or unit
-  assignment**. Those require verified instrument configuration and wiring.
+- Numbered channel slots have **no automatic L–L, L–G, current, phase-angle, or unit
+  assignment**. The new energy trend/demand fields use verified vendor names;
+  physical wiring and instrument configuration still require verification.
 - Waveform and transient samples are instantaneous quantities. This tool does
   not calculate RMS current, identify breaker operation, or infer trip causes.
 - Timestamps preserve the instrument clock. They do not establish correct wall
