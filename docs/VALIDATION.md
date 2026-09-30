@@ -2,11 +2,22 @@
 
 ## Version 0.2.0 release candidate
 
-Version 0.2.0 adds named tag-70/71 layouts. Their regression tests and independent
-native-export comparison scope are documented in
-[ENERGY_LAYOUTS.md](ENERGY_LAYOUTS.md). Independent comparison of the new layouts
-with native exports is pending; the historical results below are not a PASS for
-those new extraction paths or a completed 0.2.0 release validation.
+Version 0.2.0 adds named tag-70/71 layouts and a
+[reproducible native-export validator](NATIVE_VALIDATION.md). Against two native
+imports, the actual decoder matched all 2,208,800 named measurement values,
+60,240 timestamps, and 30,120 nominal periods exactly. Both embedded source FELs
+were byte-identical to the decoded inputs. Maximum errors and mismatch counts
+were zero. These native tables contained no NaNs; missing-value handling is
+covered by the synthetic tests. The clean tested commit and sanitized result are
+recorded in [PR #1](https://github.com/thewhitebuffalo/FEL-helper/pull/1).
+
+The expanded local suite passes 112 tests plus 135 subtests. The original eight
+recordings retain the same original output arrays and pass their vendor event
+and transient comparisons. Structural checks also pass for all six additional
+energy recordings (30,131 energy-trend records and 60,258 demand records).
+Only two of those six have independent native exports; structural checks on the
+other four do not establish independent vendor agreement. See
+[ENERGY_LAYOUTS.md](ENERGY_LAYOUTS.md) for the supported mapping and its limits.
 
 ## Historical validation of version 0.1.0
 

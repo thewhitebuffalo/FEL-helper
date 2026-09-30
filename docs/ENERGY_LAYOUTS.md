@@ -79,6 +79,15 @@ used to establish the mapping. Six unique local files shared the 744-byte trend
 layout. Only two had native exports; generalization to the other four is based on
 that shared layout, not independent vendor confirmation for every file.
 
+The version 0.2.0 revision repeats the comparison against the actual decoder
+using [the native-export validator](NATIVE_VALIDATION.md). It checks every named
+value, timestamp, nominal period, and NaN position, and verifies the embedded
+source FEL byte identity. All 2,299,160 cells matched exactly. The sanitized
+result identifies the clean tested commit in
+[PR #1](https://github.com/thewhitebuffalo/FEL-helper/pull/1); source data remain
+private. The general scalar harness now also covers tags 70 and 71, while
+explicitly distinguishing structural checks from independent native evidence.
+
 Client files, paths, instrument identifiers, hashes and extracted measurements are
 not included in this repository. Synthetic CI tests do not replace validation
 against new vendor exports when another profile is added.

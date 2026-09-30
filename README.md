@@ -124,9 +124,11 @@ Tests generate synthetic bytes in memory. No client recordings or extracted
 client data are included. See [VALIDATION.md](docs/VALIDATION.md) for the tested
 scope and for independent validation against locally held vendor exports.
 
-This branch targets version 0.2.0. The published 0.1.0 validation results are
-historical; native-export comparison of the new named energy layouts is pending.
-Synthetic regression tests do not establish agreement with native exports.
+Version 0.2.0 adds [reproducible native-export validation](docs/NATIVE_VALIDATION.md).
+The actual decoder matched all 2,299,160 measurement and metadata cells in two
+native imports exactly. The tested commit and sanitized result are recorded in
+[PR #1](https://github.com/thewhitebuffalo/FEL-helper/pull/1). Synthetic regression
+tests remain separate from this vendor-export evidence.
 
 The source can be run before installation using
 `PYTHONPATH=src python -m fel_decoder --help` on macOS/Linux.
