@@ -10,6 +10,7 @@ import time
 from . import __version__
 from .core import FelError, KNOWN_SIZES, decode_file, scan_bytes
 from .export import export_decoded
+from .layouts import layout_inventory, resolve_layout
 
 
 def _parser():
@@ -40,16 +41,19 @@ def _inspect(path, as_json):
         "record_count": len(records),
         "record_counts": {str(tag): count for tag, count in sorted(counts.items())},
         "uninterpreted_record_counts": {
-            str(tag): count for tag, count in sorted(counts.items()) if tag not in KNOWN_SIZES
+            str(tag): count for tag, count in sorted(Counter(
+                r.tag for r in records if resolve_layout(r.tag, r.size) is None
+            ).items())
         },
+        "record_layouts": layout_inventory(records),
     }
     if as_json:
         print(json.dumps(inventory, indent=2))
     else:
         print(f"{path.name}: {len(data):,} bytes, {len(records):,} records")
-        for tag, count in sorted(counts.items()):
-            status = "selected fields supported" if tag in KNOWN_SIZES else "uninterpreted"
-            print(f"  tag {tag}: {count:,} ({status})")
+        for item in inventory["record_layouts"]:
+            status = "selected fields supported" if item["status"] == "supported" else "uninterpreted"
+            print(f"  tag {item['tag']}: {item['count']:,} ({status}); size {item['size']}")
         print("Inventory validates framing only; decoding also checks supported record layouts.")
 
 

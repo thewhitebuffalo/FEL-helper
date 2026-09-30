@@ -102,6 +102,10 @@ still needed for these fields. The rest of the record is **not decoded**.
 
 ## Array schema
 
+Tags 70 and 71 use separate named energy-trend and demand layouts, documented in
+[ENERGY_LAYOUTS.md](ENERGY_LAYOUTS.md). Dispatch uses the explicit profile/tag/size
+registry; these are not alternate interpretations of tag 119's unnamed slots.
+
 Every group retains `record_offset`, `start_ticks`, and `end_ticks`, all uint64.
 Waveform/transient groups retain per-record `sample_start` (uint64),
 `sample_count` (uint32), and `coefficients` (float32, record × channel × 2).
