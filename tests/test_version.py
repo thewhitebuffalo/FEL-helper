@@ -21,7 +21,7 @@ def _event_recording():
 
 
 def test_package_and_manifest_share_release_version():
-    assert release_version == "0.2.0"
+    assert release_version == "0.2.1"
     assert __version__ == release_version
     assert decode_bytes(_event_recording()).manifest()["decoder_version"] == release_version
 
