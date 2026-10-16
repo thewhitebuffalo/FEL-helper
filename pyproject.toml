@@ -10,6 +10,8 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["numpy>=1.24,<3"]
 authors = [{name = "Jason Strebe"}]
+license = {text = "MIT"}
+classifiers = ["License :: OSI Approved :: MIT License"]
 
 [project.optional-dependencies]
 test = ["pytest>=8,<10", "pyarrow>=14", "olefile>=0.47"]

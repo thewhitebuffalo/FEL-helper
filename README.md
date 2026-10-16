@@ -132,3 +132,7 @@ tests remain separate from this vendor-export evidence.
 
 The source can be run before installation using
 `PYTHONPATH=src python -m fel_decoder --help` on macOS/Linux.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
